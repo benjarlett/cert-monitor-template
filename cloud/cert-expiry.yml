@@ -1,0 +1,75 @@
+name: certificate expiry monitor
+
+# Off-account HTTPS certificate monitor.
+#
+# Runs on GitHub's infrastructure, so it still reports when the Namecheap
+# hosting account, its DNS, or the server itself is unreachable — the case that
+# $HOME/.cert-monitor/check-certs.sh on the hosting account cannot
+# cover, because that one dies with the thing it watches.
+#
+# Alerts go to the same ntfy topic as acme.sh, via the NTFY_TOPIC repository
+# secret. The topic is never stored in this repository.
+
+on:
+  schedule:
+    # 07:00 UTC = 08:00 BST in summer, 07:00 GMT in winter. GitHub cron is
+    # always UTC, so the local time shifts by an hour across DST.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      # Testing only: a routine dispatch leaves these empty and the script uses
+      # its real thresholds of 30/14/7. Setting them higher forces every
+      # endpoint to alert, which is how the ntfy push path gets verified.
+      thresholds_override:
+        description: "TEST ONLY: space-separated thresholds, e.g. '400 300 200'"
+        required: false
+        default: ""
+      warn_days_override:
+        description: "TEST ONLY: WARN_DAYS override, e.g. 500"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cert-expiry-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check public HTTPS certificates
+        id: check
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          THRESHOLDS_OVERRIDE: ${{ inputs.thresholds_override }}
+          WARN_DAYS_OVERRIDE: ${{ inputs.warn_days_override }}
+        run: bash .github/scripts/check-certs.sh
+        continue-on-error: true
+
+      - name: Record run and alert state
+        if: always()
+        run: |
+          git config user.name "cert-expiry-monitor"
+          git config user.email "cert-expiry-monitor@users.noreply.github.com"
+          # The daily history line doubles as a heartbeat: GitHub disables
+          # scheduled workflows after 60 days of repository inactivity, and this
+          # commit keeps the monitor alive as well as proving it ran.
+          git add -A .state 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no state change to commit"
+          else
+            git commit -m "cert monitor run $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
+
+      - name: Fail the run if problems were found
+        if: steps.check.outcome == 'failure'
+        run: |
+          echo "The certificate check reported problems."
+          echo "See the ntfy alert and the step log above."
+          exit 1
