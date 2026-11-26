@@ -74,7 +74,7 @@ require __DIR__ . '/config.php';
     </form>
     <p class="hint">
       The owner label names whoever renews the certificate and is only used for sites served
-      elsewhere: <code>vercel</code>, <code>namecheap-julie</code>, <code>other</code>. Sites
+      elsewhere: <code>vercel</code>, <code>managed-other</code>, <code>other</code>. Sites
       served from this account are labelled automatically. Adding is what the monitor uses to
       decide whether a certificate must be Let's Encrypt.
     </p>

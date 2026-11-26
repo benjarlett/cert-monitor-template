@@ -34,7 +34,7 @@ SSL_BACKUPS="${SSL_BACKUPS:-$HOME/.ssl-backups}"
 STATE="${STATE:-$HOME/.cert-monitor/alerted}"
 CLOUD_REPO_DIR="${CLOUD_REPO_DIR:-$HOME/.cert-monitor/cloud-repo}"
 EXPECTED_IP=203.0.113.10
-CLOUD_REPO='~/DS Workpace/cert-monitor/cloud'
+CLOUD_REPO='~/cert-monitor/cloud'
 
 ACTION=""; DOMAIN=""; DRY=0; ASSUME_YES=0
 while [ $# -gt 0 ]; do
@@ -256,7 +256,7 @@ cloud_manual() { # fallback instructions, only if the sync above cannot run
   head1 "Sync the cloud monitor's list by hand"
   say "The off-account monitor keeps its own copy of the domain list. From your Mac:"
   say ""
-  say "  cd \"\$HOME/DS Workpace/cert-monitor/cloud\""
+  say "  cd \"\$HOME/cert-monitor/cloud\""
   say "  git pull --quiet"
   say "  # apply the same list edit to .github/scripts/check-certs.sh"
   say "  git commit -am \"monitor list: $1\" && git push"

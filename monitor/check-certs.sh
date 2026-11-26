@@ -13,8 +13,8 @@
 # Usage: check-certs.sh [--quiet] [--list-urls]
 set -o pipefail
 
-ACCOUNT_CONF="$HOME/.acme.sh/account.conf
-BASE="$HOME/.cert-monitor
+ACCOUNT_CONF="$HOME/.acme.sh/account.conf"
+BASE="$HOME/.cert-monitor"
 STATE_FILE="${STATE_FILE:-$BASE/alerted}"
 NTFY_URL=https://ntfy.sh
 
@@ -55,7 +55,7 @@ TOPIC=$(sed -n "s/^SAVED_NTFY_TOPIC='\(.*\)'$/\1/p" "$ACCOUNT_CONF")
 
 push() {
   [ -z "$TOPIC" ] && return 0
-  curl -sS --max-time 20 -H "Title: $1" -H "Priority: high" -H "Tags: warning" \
+  curl -fsS --max-time 20 -H "Title: $1" -H "Priority: high" -H "Tags: warning" \
     -d "$2" "$NTFY_URL/$TOPIC" >/dev/null 2>&1
 }
 already_alerted() { grep -qxF "$1" "$STATE_FILE" 2>/dev/null; }
@@ -74,7 +74,11 @@ emit_row() {
 
 check_host() {
   host="$1"; owner="$2"
-  handshake=$(echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null)
+  if command -v timeout >/dev/null 2>&1; then
+    handshake=$(timeout 15 openssl s_client -connect "$host:443" -servername "$host" </dev/null 2>/dev/null)
+  else
+    handshake=$(openssl s_client -connect "$host:443" -servername "$host" </dev/null 2>/dev/null)
+  fi
   enddate=$(printf '%s\n' "$handshake" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
 
   if [ -z "$enddate" ]; then
@@ -83,7 +87,7 @@ check_host() {
     emit_row fail "$host" "$owner" "" "" "" ""
     return
   fi
-  end_epoch=$(date -u -d "$enddate" +%s 2>/dev/null)
+  end_epoch=$(date -u -d "$enddate" +%s 2>/dev/null || date -u -j -f "%b %d %T %Y %Z" "$enddate" +%s 2>/dev/null)
   if [ -z "$end_epoch" ]; then
     problems=$((problems+1)); report+=("FAIL  $host [$owner] — cannot parse expiry '$enddate'")
     if ! already_alerted "parse:$host"; then mark_alerted "parse:$host"; alerts+=("$host [$owner]: cannot parse expiry '$enddate'"); fi
@@ -118,7 +122,7 @@ check_host() {
       # serve a commercial certificate of its own (a Sectigo PositiveSSL,
       # say); alerting on that would be a permanent false alarm. The issuer
       # is still reported, and expiry is still checked.
-      if [ "$owner" = "namecheap-acme" ]; then
+      if [ "$owner" = "managed-acme" ]; then
         issuer_cn=$(printf '%s\n' "$issuer_full" | sed -n 's/.*CN *= *//p')
         problems=$((problems+1))
         issuer_note=" [NOT Let's Encrypt: ${issuer_cn:-unknown}]"
@@ -174,7 +178,7 @@ check_entry() {
     *) echo "unknown entry mode '$mode' for $d" >&2; problems=$((problems+1)) ;;
   esac
 }
-for e in $MANAGED; do check_entry "$e" "namecheap-acme"; done
+for e in $MANAGED; do check_entry "$e" "managed-acme"; done
 for e in $THIRD_PARTY; do check_entry "$e" "vercel-or-squarespace"; done
 
 if [ "$QUIET" = "0" ] && [ "$ROWS" = "0" ]; then

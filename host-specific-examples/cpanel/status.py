@@ -14,8 +14,8 @@ import subprocess
 import sys
 import time
 
-BASE = "$HOME/.cert-monitor"
-ACME_HOME = "$HOME/.acme.sh"
+BASE = os.path.expanduser("~/.cert-monitor")
+ACME_HOME = os.path.expanduser("~/.acme.sh")
 ACCOUNT_CONF = os.path.join(ACME_HOME, "account.conf")
 TSV = os.path.join(BASE, "status.tsv")
 MONITOR = os.path.join(BASE, "check-certs.sh")
@@ -208,7 +208,7 @@ def parse_lists():
         for token in match.group(1).split():
             parts = token.split("|")
             out.append({"domain": parts[0],
-                        "owner": parts[1] if len(parts) > 1 and parts[1] != "apex" else "namecheap-acme",
+                        "owner": parts[1] if len(parts) > 1 and parts[1] != "apex" else "managed-acme",
                         "apex_only": "apex" in parts[1:]})
         return out
 
